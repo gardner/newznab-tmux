@@ -1,4 +1,2 @@
-vendor/
-docker/mariadb-data
-docker/redis-data
-docker/manticore-data
+.git
+.github

@@ -84,22 +84,22 @@ Use [mysqltuner.pl](http://mysqltuner.pl "MySQL tuner - Use it!") for recommenda
 
 Start installation script and configuration
 ```bash
-  docker-compose run --rm nn-tmux sh /tmp/install.sh
+  docker-compose run --rm nntmux sh /tmp/install.sh
   # answer the questions, since this will fetch predb entries this takes an hour or two, just press ctrl + c if you dont like it ;)
-  docker-compose run --rm --service-ports -T nn-tmux apachectl -D FOREGROUND 
+  docker-compose run --rm --service-ports -T nntmux apachectl -D FOREGROUND 
 ```
  Open http://localhost:8089
  sign in as admin (username, password from .env) and configure side settings and tmux settings
 ```bash
   # ctrl + c
-  docker-compose up nn-tmux
+  docker-compose up nntmux
   # check the logs, if everything is working fine ctrl + c
   # start and run in background
-  docker-compose up -d nn-tmux
+  docker-compose up -d nntmux
   # start the automatic import
-  docker-compose up -d nn-tmux-ui
+  docker-compose up -d nntmux-ui
   # check the monitor tmux
-  docker exec -it nn-tmux-ui bash
+  docker exec -it nntmux-ui bash
   # attach
   root@:/var/www/NNTmux# sudo -E -u notroot tmux attach -d
   # stop

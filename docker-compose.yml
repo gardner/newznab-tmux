@@ -4,21 +4,21 @@ services:
     image: redis:5
     restart: unless-stopped
     volumes:
-      - $PWD/docker/redis-data;/data
-      - $PWD/docker/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./docker/redis.conf:/usr/local/etc/redis/redis.conf
+      - ${USER_DATA_DIR}/docker/redis-data:/data
   manticore:
     image: manticoresearch/manticore:3
     restart: unless-stopped
     volumes:
-      - $PWD/docker/manticore-data;/var/lib/manticore/data
-      - $PWD/docker/sphinx.conf:/etc/sphinxsearch/sphinx.conf
+      - ./docker/sphinx.conf:/etc/sphinxsearch/sphinx.conf
+      - ${USER_DATA_DIR}/docker/manticore-data:/var/lib/manticore/data
   mariadb:
     image: mariadb:10
     restart: unless-stopped
     volumes:
-      - $PWD/docker/my.cnf:/etc/mysql/conf.d/newsnab-tmux.cnf
-      - $PWD/docker/mariadb-data:/var/lib/mysql
-      - $PWD:/var/www/NNTmux/
+      - ./docker/initdb.sh:/docker-entrypoint-initdb.d/initdb.sh
+      - ./docker/mariadb:/etc/mysql/conf.d
+      - ${USER_DATA_DIR}/docker/mariadb-data:/var/lib/mysql
     env_file: .env
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOTPASSWORD}
@@ -26,18 +26,19 @@ services:
       MYSQL_USER: ${DB_USERNAME}
       MYSQL_PASSWORD: ${DB_PASSWORD}
       TZ: ${APP_TZ}
-  nn-tmux: &nn-tmux
+  nntmux: &nntmux
     build:
       context: .
-    restart: unless-stopped
-    container_name: nn-tmux
+      dockerfile: Dockerfile
+    restart: "no"
+    entrypoint: /entrypoint.sh
+    container_name: nntmux
     command: apachectl -D FOREGROUND
     volumes:
-      - /var/www/NNTmux/vendor/
-      - $PWD:/var/www/NNTmux/
+      - install-lock:/var/www/NNTmux/_install
     env_file: .env
     ports:
-      - 127.0.0.1:8089:80
+      - 8080:8080
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOTPASSWORD}
       TZ: ${APP_TZ}
@@ -45,16 +46,19 @@ services:
       - mariadb
       - redis
       - manticore
-  nn-tmux-ui:
-    <<: *nn-tmux
-    container_name: nn-tmux-ui
-    stdin_open: true
-    tty: true
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOTPASSWORD}
-      TZ: ${APP_TZ}
-      COLUMNS: "`tput cols`"
-      LINES: "`tput lines`"
-    command: sudo -E -u notroot php artisan tmux-ui:start
-    ports:
-      - 127.0.0.1:12345:12345
+  # nntmux-ui:
+  #   <<: *nntmux
+  #   container_name: nntmux-ui
+  #   stdin_open: true
+  #   tty: true
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: ${DB_ROOTPASSWORD}
+  #     TZ: ${APP_TZ}
+  #     COLUMNS: "`tput cols`"
+  #     LINES: "`tput lines`"
+  #   command: php artisan tmux-ui:start
+  #   ports:
+  #     - 127.0.0.1:12345:12345
+
+volumes:
+  install-lock:

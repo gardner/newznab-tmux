@@ -1,0 +1,59 @@
+ARG PHP_VERSION=7.4
+
+# Use this image as the base image
+FROM php:${PHP_VERSION}-apache as common
+ADD https://raw.githubusercontent.com/mlocati/docker-php-extension-installer/master/install-php-extensions /usr/local/bin/
+
+RUN apt-get -q update \
+ && apt-get install -qy \
+      unzip \
+      unrar-free \
+      p7zip-full \
+      mediainfo \
+      lame \
+      ffmpeg \
+      wget \
+ && chmod uga+x /usr/local/bin/install-php-extensions \
+ && install-php-extensions gd intl zip bcmath imagick sockets exif pdo_mysql pcntl \
+ && a2enmod rewrite \
+ && chown -R www-data:www-data /var/www/html \
+ && echo Listen 8080 > /etc/apache2/ports.conf \
+ && cp "$PHP_INI_DIR/php.ini-${APP_ENV}" "$PHP_INI_DIR/php.ini"
+
+COPY ./docker/NNTmux.conf /etc/apache2/sites-available/000-default.conf
+COPY ./docker/php.ini "$PHP_INI_DIR/conf.d/nntmux.ini"
+COPY ./docker/entrypoint.sh /
+
+# In this image we will download the dependencies, but without the development dependencies.
+# The dependencies are installed in the vendor folder that will later be copied.
+FROM composer as builder-dev
+WORKDIR /app
+COPY composer.* /app/
+RUN composer install  \
+    --ignore-platform-reqs \
+    --no-ansi \
+    --no-autoloader \
+    --no-interaction \
+    --no-scripts
+COPY . /app
+RUN composer dump-autoload --optimize --classmap-authoritative
+
+
+# This is the image using in development.
+FROM common as dev
+# We only install xdebug in development.
+RUN pecl install xdebug-2.6.0; \
+    docker-php-ext-enable xdebug
+
+WORKDIR /var/www/NNTmux
+
+# We enable the errors only in development.
+ENV DISPLAY_ERRORS="On"
+
+# Copy our application.
+COPY . ./
+# Copy the downloaded dependencies from the previous stage.
+COPY --from=builder-dev /app/vendor /var/www/html/vendor
+# Setup PHP for development.
+COPY php-dev.ini /usr/local/etc/php/php.ini
+RUN composer dump-autoload --optimize --classmap-authoritative

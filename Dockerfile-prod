@@ -1,0 +1,57 @@
+ARG PHP_VERSION=7.4
+ARG APP_ENV=production
+ARG APP_DIR=/var/www/NNTmux
+
+# Use this image as the base image
+FROM php:${PHP_VERSION}-apache as common
+ARG APP_ENV
+
+ADD https://raw.githubusercontent.com/mlocati/docker-php-extension-installer/master/install-php-extensions /usr/local/bin/
+
+RUN apt-get -q update \
+ && apt-get install -qy \
+      unzip \
+      unrar-free \
+      p7zip-full \
+      mediainfo \
+      lame \
+      ffmpeg \
+      wget \
+ && chmod uga+x /usr/local/bin/install-php-extensions \
+ && install-php-extensions gd intl zip bcmath imagick sockets exif pdo_mysql pcntl redis \
+ && a2enmod rewrite \
+ && echo Listen 8080 > /etc/apache2/ports.conf \
+ && cp "$PHP_INI_DIR/php.ini-${APP_ENV}" "$PHP_INI_DIR/php.ini"
+
+COPY ./docker/NNTmux.conf /etc/apache2/sites-available/000-default.conf
+COPY ./docker/php.ini "$PHP_INI_DIR/conf.d/nntmux.ini"
+COPY ./docker/entrypoint.sh /
+
+# In this image we will download the dependencies, but without the development dependencies.
+# The dependencies are installed in the vendor folder that will be copied later into the prod image.
+FROM composer:1.9 as builder
+WORKDIR /app
+COPY composer.* /app/
+RUN composer global require hirak/prestissimo \
+ && composer install  \
+    --ignore-platform-reqs \
+    --no-ansi \
+    --no-dev \
+    --no-autoloader \
+    --no-interaction \
+    --no-scripts
+COPY . /app
+RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
+
+FROM common as prod
+ARG APP_DIR
+WORKDIR ${APP_DIR}
+
+COPY . .
+COPY --from=builder /app/vendor .
+
+RUN chown -R www-data:www-data /var/www
+
+VOLUME ["/var/www/NNTmux/vendor"]
+
+EXPOSE 8080
