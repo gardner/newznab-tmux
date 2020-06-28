@@ -15,7 +15,6 @@
 
 # TODO Determine how to determine if installed
 
-
 if ! php artisan migrate:status; then
   php artisan nntmux:install
   php /var/www/NNTmux/misc/manticoresearch/create_se_tables.php manticore 9312

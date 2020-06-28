@@ -25,19 +25,25 @@ RUN apt-get -q update \
  && echo Listen 8080 > /etc/apache2/ports.conf \
  && a2enmod rewrite
 
-## Configure php.ini
-COPY docker/NNTmux.conf /etc/apache2/sites-available/000-default.conf 
-COPY docker/php.ini "$PHP_INI_DIR/conf.d/nntmux.ini"
-COPY docker/entrypoint.sh /entrypoint.sh
-COPY --chown=www-data:www-data composer.* ./
-
 ## Composer
 RUN mv "$PHP_INI_DIR/php.ini-${APP_ENV}" "$PHP_INI_DIR/php.ini" \
  && wget https://raw.githubusercontent.com/composer/getcomposer.org/${COMPOSER_COMMIT_HASH}/web/installer -O - -q | \
     php -- --version=1.9.3 --quiet --install-dir=/usr/local/bin --filename=composer \
  && chmod +x /usr/local/bin/composer \
- && composer global require hirak/prestissimo \
- && composer install --ignore-platform-reqs --no-autoloader --no-interaction --no-plugins --no-scripts --prefer-dist
+ && composer global require hirak/prestissimo
+
+COPY --chown=www-data:www-data composer.* ./
+RUN composer install --ignore-platform-reqs --no-autoloader --no-interaction --no-plugins --no-scripts --prefer-dist
+
+## Configure php.ini
+COPY docker/NNTmux.conf /etc/apache2/sites-available/000-default.conf
+COPY docker/php.ini "$PHP_INI_DIR/conf.d/nntmux.ini"
+COPY docker/entrypoint.sh /entrypoint.sh
+
+RUN sed -i 's/ServerTokens OS/ServerTokens Prod/' /etc/apache2/conf-available/security.conf \
+ && sed -i 's/ServerSignature On/ServerSignature Off/' /etc/apache2/conf-available/security.conf \
+ && echo "ServerName nntmux.arb.pw" >> /etc/apache2/conf-available/servername.conf \
+ && a2enconf servername
 
 COPY --chown=www-data:www-data . ./
 

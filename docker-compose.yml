@@ -1,17 +1,35 @@
 version: '3.4'
 services:
+  redis-overcommit:
+    image: redis:5
+    restart: 'no'
+    privileged: true
+    command: |
+      bash -c "
+        echo 1 > /mnt/vm/overcommit_memory ;
+        echo never > /var/transparent_hugepage
+      "
+    volumes:
+      - /proc/sys/vm:/mnt/vm
+      - /sys/kernel/mm/transparent_hugepage:/mnt/transparent_hugepage
+
   redis:
     image: redis:5
     restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
     volumes:
       - ./docker/redis.conf:/usr/local/etc/redis/redis.conf
       - ${USER_DATA_DIR}/docker/redis-data:/data
+    depends_on:
+      - redis-overcommit
+
   manticore:
     image: manticoresearch/manticore:3
     restart: unless-stopped
     volumes:
       - ./docker/sphinx.conf:/etc/sphinxsearch/sphinx.conf
       - ${USER_DATA_DIR}/docker/manticore-data:/var/lib/manticore/data
+
   mariadb:
     image: mariadb:10
     restart: unless-stopped
@@ -26,6 +44,7 @@ services:
       MYSQL_USER: ${DB_USERNAME}
       MYSQL_PASSWORD: ${DB_PASSWORD}
       TZ: ${APP_TZ}
+
   nntmux: &nntmux
     build:
       context: .
@@ -33,6 +52,8 @@ services:
     restart: "no"
     entrypoint: /entrypoint.sh
     container_name: nntmux
+    hostname: nntmux
+    domainname: arp.pw
     command: apachectl -D FOREGROUND
     volumes:
       - install-lock:/var/www/NNTmux/_install
@@ -46,6 +67,7 @@ services:
       - mariadb
       - redis
       - manticore
+  
   # nntmux-ui:
   #   <<: *nntmux
   #   container_name: nntmux-ui
